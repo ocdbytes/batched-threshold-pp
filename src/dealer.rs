@@ -1,4 +1,4 @@
-use ark_ec::{pairing::Pairing, scalar_mul::fixed_base::FixedBase, Group};
+use ark_ec::{pairing::Pairing, scalar_mul::ScalarMul, PrimeGroup, VariableBaseMSM};
 use ark_ff::PrimeField;
 use ark_poly::{domain::EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::*;
@@ -8,10 +8,10 @@ use std::{iter, vec};
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct CRS<E: Pairing> {
-    pub powers_of_g: Vec<E::G1>,
+    pub powers_of_g: Vec<E::G1Affine>,
     pub htau: E::G2,
 
-    pub y: Vec<E::G1>,
+    pub y: Vec<E::G1Affine>,
 
     pub lagrange_coeffs_0: Vec<E::ScalarField>,
 }
@@ -55,12 +55,7 @@ where
         let h = E::G2::generator();
 
         // Compute powers of g
-        let window_size = FixedBase::get_mul_window_size(self.batch_size);
-        let scalar_size = E::ScalarField::MODULUS_BIT_SIZE as usize;
-
-        let g_table = FixedBase::get_window_table(scalar_size, window_size, g);
-        let powers_of_g =
-            FixedBase::msm::<E::G1>(scalar_size, window_size, &g_table, &powers_of_tau);
+        let powers_of_g = g.batch_mul(&powers_of_tau);
 
         // Compute the Toeplitz matrix preprocessing ==================================================
         let mut top_tau = powers_of_tau.clone();
@@ -73,11 +68,7 @@ where
         let top_tau = top_domain.fft(&top_tau);
 
         // Compute powers of top_tau
-        let window_size = FixedBase::get_mul_window_size(2 * self.batch_size);
-        let scalar_size = E::ScalarField::MODULUS_BIT_SIZE as usize;
-
-        let top_tau_table = FixedBase::get_window_table(scalar_size, window_size, g);
-        let y = FixedBase::msm::<E::G1>(scalar_size, window_size, &top_tau_table, &top_tau);
+        let y = g.batch_mul(&top_tau);
 
         let mut sk_shares = vec![E::ScalarField::zero(); self.n];
         sk_shares[0] = self.sk;

@@ -1,4 +1,4 @@
-use ark_ec::{pairing::Pairing, Group};
+use ark_ec::{pairing::Pairing, PrimeGroup};
 use ark_ff::Field;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::*;
@@ -57,7 +57,7 @@ impl<E: Pairing> SecretKey<E> {
 /// decrypts all the ciphertexts in a batch
 pub fn decrypt_all<E: Pairing>(
     public_keys: &Vec<E::G2>,
-    partial_decryptions: &Vec<E::G1>,
+    partial_decryptions: &Vec<E::G1Affine>,
     ct: &Vec<Ciphertext<E>>,
     hid: E::G1,
     crs: &CRS<E>,
@@ -81,8 +81,10 @@ pub fn decrypt_all<E: Pairing>(
     // check that all partial_decryptions are valid
     let h_inv = -E::G2::generator();
     for i in 0..public_keys.len() {
-        let should_be_zero =
-            E::multi_miller_loop([delta, partial_decryptions[i]], [public_keys[i], h_inv]);
+        let should_be_zero = E::multi_miller_loop(
+            [delta, partial_decryptions[i].into()],
+            [public_keys[i], h_inv],
+        );
 
         let should_be_zero = E::final_exponentiation(should_be_zero).unwrap();
 

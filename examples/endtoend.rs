@@ -11,6 +11,7 @@ use batch_threshold::{
 type E = Bls12_381;
 type Fr = <E as Pairing>::ScalarField;
 type G1 = <E as Pairing>::G1;
+type G1Affine = <E as Pairing>::G1Affine;
 
 fn main() {
     let mut rng = ark_std::test_rng();
@@ -39,10 +40,10 @@ fn main() {
     }
 
     // generate partial decryptions
-    let mut partial_decryptions: Vec<G1> = Vec::new();
+    let mut partial_decryptions: Vec<G1Affine> = Vec::new();
     for i in 0..n {
         let partial_decryption = secret_key[i].partial_decrypt(&ct, hid, pk, &crs);
-        partial_decryptions.push(partial_decryption);
+        partial_decryptions.push(partial_decryption.into());
     }
 
     let messages = decrypt_all(&public_keys, &partial_decryptions, &ct, hid, &crs);

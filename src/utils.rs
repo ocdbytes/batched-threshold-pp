@@ -1,4 +1,4 @@
-use ark_ec::{pairing::Pairing, CurveGroup, Group, VariableBaseMSM};
+use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_ff::PrimeField;
 use ark_poly::{
     univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, Polynomial,
@@ -66,12 +66,11 @@ pub fn compute_opening_proof<E: Pairing>(
     pedersen_commit::<E::G1>(&crs.powers_of_g, &witness_polynomial.coeffs())
 }
 
-pub fn pedersen_commit<G: Group + CurveGroup>(bases: &[G], scalars: &[G::ScalarField]) -> G {
+pub fn pedersen_commit<G: CurveGroup>(bases: &[G::Affine], scalars: &[G::ScalarField]) -> G {
     debug_assert_eq!(bases.len(), scalars.len());
 
     let plain_scalars = convert_to_bigints(&scalars);
-    let affine_bases = bases.iter().map(|g| g.into_affine()).collect::<Vec<_>>();
-    <G as VariableBaseMSM>::msm_bigint(&affine_bases, &plain_scalars)
+    <G as VariableBaseMSM>::msm_bigint(&bases, &plain_scalars)
 }
 
 fn convert_to_bigints<F: PrimeField>(p: &[F]) -> Vec<F::BigInt> {
@@ -85,7 +84,7 @@ fn convert_to_bigints<F: PrimeField>(p: &[F]) -> Vec<F::BigInt> {
 /// See https://github.com/khovratovich/Kate/blob/master/Kate_amortized.pdf
 /// eprint version has a bug and hasn't been updated
 pub fn open_all_values<E: Pairing>(
-    y: &Vec<E::G1>,
+    y: &Vec<E::G1Affine>,
     f: &Vec<E::ScalarField>,
     domain: &Radix2EvaluationDomain<E::ScalarField>,
 ) -> Vec<E::G1> {
@@ -120,7 +119,7 @@ pub fn open_all_values<E: Pairing>(
 #[cfg(test)]
 mod tests {
     use ark_bls12_381::Bls12_381;
-    use ark_ec::{bls12::Bls12, pairing::Pairing, Group};
+    use ark_ec::{bls12::Bls12, pairing::Pairing, PrimeGroup};
     use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, Polynomial};
     use ark_std::{UniformRand, Zero};
 

@@ -1,4 +1,4 @@
-use ark_ec::{pairing::Pairing, Group};
+use ark_ec::{pairing::Pairing, PrimeGroup};
 use ark_ff::{Field, PrimeField};
 use ark_serialize::*;
 use ark_std::UniformRand;

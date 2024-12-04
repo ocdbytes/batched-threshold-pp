@@ -2,15 +2,22 @@
 name = "batch-threshold"
 version = "0.1.0"
 edition = "2021"
-authors = [ "Guru-Vamsi Policharla" ]
+authors = ["Guru-Vamsi Policharla"]
 
 [dependencies]
-ark-poly = {version = "0.4.0", default-features = false}
-ark-ff = {version = "0.4.0", default-features = false}
-ark-ec = {version = "0.4.0", default-features = false}
-ark-std = {version = "0.4.0", default-features = false, features = [ "print-trace", "std" ] }
-ark-serialize = {version = "0.4.0", default-features = false, features = ["derive"] }
-ark-bls12-381 = {version = "0.4.0", default-features = false, features = ["curve"] }
+ark-poly = { version = "0.5.0", default-features = false }
+ark-ff = { version = "0.5.0", default-features = false }
+ark-ec = { version = "0.5.0", default-features = false }
+ark-std = { version = "0.5.0", default-features = false, features = [
+    "print-trace",
+    "std",
+] }
+ark-serialize = { version = "0.5.0", default-features = false, features = [
+    "derive",
+] }
+ark-bls12-381 = { version = "0.5.0", default-features = false, features = [
+    "curve",
+] }
 
 blake3 = { version = "1.0", default-features = false }
 merlin = { version = "3.0", default-features = false }
@@ -19,7 +26,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 rand = { version = "0.8", features = ["std"] }
 
 [features]
-asm = [ "ark-ff/asm" ]
+asm = ["ark-ff/asm"]
 
 [[bench]]
 name = "encryption"
