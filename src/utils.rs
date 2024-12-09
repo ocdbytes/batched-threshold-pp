@@ -1,28 +1,15 @@
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
+use ark_ff::FftField;
 use ark_poly::{
-    univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, Polynomial,
-    Radix2EvaluationDomain,
+    domain::DomainCoeff, univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain,
+    Polynomial, Radix2EvaluationDomain,
 };
 use ark_serialize::CanonicalSerialize;
 use ark_std::{One, Zero};
 use merlin::Transcript;
-use std::ops::Div;
+use std::{collections::BTreeMap, ops::Div};
 
 use crate::dealer::CRS;
-
-pub fn transpose<T>(v: Vec<Vec<T>>) -> Vec<Vec<T>> {
-    assert!(!v.is_empty());
-    let len = v[0].len();
-    let mut iters: Vec<_> = v.into_iter().map(|n| n.into_iter()).collect();
-    (0..len)
-        .map(|_| {
-            iters
-                .iter_mut()
-                .map(|n| n.next().unwrap())
-                .collect::<Vec<T>>()
-        })
-        .collect()
-}
 
 pub fn hash_to_bytes<T: CanonicalSerialize>(inp: T) -> [u8; 32] {
     let mut bytes = Vec::new();
@@ -45,6 +32,47 @@ pub fn add_to_transcript<T: CanonicalSerialize>(
     let mut data_bytes = Vec::new();
     data.serialize_uncompressed(&mut data_bytes).unwrap();
     ts.append_message(label, &data_bytes);
+}
+
+/// interpolates a polynomial over poly_evals and evaluates it at points
+pub fn lagrange_interp_eval<F: FftField, T: DomainCoeff<F>>(
+    poly_evals: &BTreeMap<F, T>,
+    points: &Vec<F>,
+) -> Vec<T> {
+    let mut x = Vec::new();
+    let mut y = Vec::new();
+    for (&x_i, &y_i) in poly_evals.iter() {
+        x.push(x_i);
+        y.push(y_i);
+    }
+
+    let mut result = Vec::new();
+    for &point in points {
+        let mut lagrange_coeffs = vec![F::one(); x.len()];
+
+        for i in 0..x.len() {
+            let mut num = F::one();
+            let mut denom = F::one();
+            for j in 0..x.len() {
+                if x[i] != x[j] {
+                    num *= point - x[j];
+                    denom *= x[i] - x[j];
+                }
+            }
+            lagrange_coeffs[i] = num / denom;
+        }
+
+        let mut point_eval = T::zero();
+        for i in 0..x.len() {
+            let mut tmp = y[i];
+            tmp.mul_assign(lagrange_coeffs[i]);
+            point_eval += tmp;
+        }
+
+        result.push(point_eval);
+    }
+
+    result
 }
 
 /// compute KZG opening proof
@@ -143,6 +171,34 @@ mod tests {
             let lhs = E::pairing(com - (g * fpoly.evaluate(&domain.element(i))), h);
             let rhs = E::pairing(pi[i], crs.htau - (h * domain.element(i)));
             assert_eq!(lhs, rhs);
+        }
+    }
+
+    #[test]
+    fn lagrange_interp_eval_test() {
+        let mut rng = ark_std::test_rng();
+        let domain_size = 1 << 2;
+        let domain = (0..domain_size)
+            .map(|i| Fr::from(i as u64))
+            .collect::<Vec<_>>();
+
+        let points = (0..domain_size)
+            .map(|i| Fr::from((i) as u64))
+            .collect::<Vec<_>>();
+
+        let f = (0..domain_size)
+            .map(|_| Fr::rand(&mut rng))
+            .collect::<Vec<_>>();
+
+        let f = DensePolynomial::from_coefficients_vec(f);
+
+        let poly_evals = BTreeMap::from_iter(domain.iter().map(|&e| (e, f.evaluate(&e))));
+
+        let computed_evals = lagrange_interp_eval(&poly_evals, &points);
+        let should_be_evals = points.iter().map(|p| f.evaluate(p)).collect::<Vec<_>>();
+
+        for i in 0..domain_size {
+            assert_eq!(computed_evals[i], should_be_evals[i]);
         }
     }
 }

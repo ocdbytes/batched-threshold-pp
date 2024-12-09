@@ -75,6 +75,10 @@ where
             sk_shares[i] = E::ScalarField::rand(rng);
         }
 
+        let share_domain = (0..self.n)
+            .map(|i| E::ScalarField::from(i as u64))
+            .collect::<Vec<_>>();
+
         let share_domain = Radix2EvaluationDomain::<E::ScalarField>::new(self.n).unwrap();
         share_domain.fft_in_place(&mut sk_shares);
 

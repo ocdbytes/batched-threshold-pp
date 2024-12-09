@@ -1,6 +1,8 @@
+use std::collections::BTreeMap;
+
 use ark_ec::{pairing::Pairing, PrimeGroup, VariableBaseMSM};
-use ark_ff::Field;
-use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
+use ark_ff::{FftField, Field};
+use ark_poly::{domain::DomainCoeff, EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::*;
 use ark_std::Zero;
 
@@ -54,6 +56,11 @@ impl<E: Pairing> SecretKey<E> {
     }
 }
 
+/// interpolate a polynomial given evaluations at sufficiently many points
+pub fn interpolate<F: FftField, T: DomainCoeff<F>>(x: Vec<F>, y: Vec<T>) -> Vec<T> {
+    todo!()
+}
+
 /// decrypts all the ciphertexts in a batch
 pub fn decrypt_all<E: Pairing>(
     public_keys: &Vec<E::G2>,
@@ -90,6 +97,16 @@ pub fn decrypt_all<E: Pairing>(
 
         assert!(should_be_zero.is_zero());
     }
+
+    // // interpolate partial decryptions to get the signature
+    // // gather partial decryptions into a vec by iterating over the BTreeMap
+    // let mut evals = Vec::new();
+    // let mut eval_points = Vec::new();
+    // // Iterate over the map and collect keys and values
+    // for (key, value) in partial_decryptions.iter() {
+    //     evals.push(*value);
+    //     eval_points.push(key);
+    // }
 
     // compute msm with lagrange_coeffs_0 and partial_decryptions
     let sigma =
