@@ -42,7 +42,7 @@ fn main() {
 
     // generate partial decryptions
     let mut partial_decryptions: BTreeMap<usize, G1> = BTreeMap::new();
-    for i in 0..n {
+    for i in 0..n / 2 {
         let partial_decryption = secret_key[i].partial_decrypt(&ct, hid, pk, &crs);
         partial_decryptions.insert(i + 1, partial_decryption);
     }
