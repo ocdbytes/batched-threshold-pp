@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use ark_bls12_381::Bls12_381;
 use ark_ec::pairing::Pairing;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
@@ -13,7 +15,6 @@ use rand::thread_rng;
 type E = Bls12_381;
 type Fr = <E as Pairing>::ScalarField;
 type G1 = <E as Pairing>::G1;
-type G1Affine = <E as Pairing>::G1Affine;
 
 fn bench_decrypt_all(c: &mut Criterion) {
     let mut rng = thread_rng();
@@ -48,10 +49,10 @@ fn bench_decrypt_all(c: &mut Criterion) {
         }
 
         // generate partial decryptions
-        let mut partial_decryptions: Vec<G1Affine> = Vec::new();
+        let mut partial_decryptions: BTreeMap<usize, G1> = BTreeMap::new();
         for i in 0..n {
             let partial_decryption = secret_key[i].partial_decrypt(&ct, hid, pk, &crs);
-            partial_decryptions.push(partial_decryption.into());
+            partial_decryptions.insert(i + 1, partial_decryption);
         }
 
         let messages = decrypt_all(&public_keys, &partial_decryptions, &ct, hid, &crs);

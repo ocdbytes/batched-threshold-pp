@@ -1,15 +1,14 @@
-use std::collections::BTreeMap;
-
 use ark_ec::{pairing::Pairing, PrimeGroup, VariableBaseMSM};
-use ark_ff::{FftField, Field};
-use ark_poly::{domain::DomainCoeff, EvaluationDomain, Radix2EvaluationDomain};
+use ark_ff::Field;
+use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::*;
 use ark_std::Zero;
+use std::collections::BTreeMap;
 
 use crate::{
     dealer::CRS,
     encryption::Ciphertext,
-    utils::{hash_to_bytes, open_all_values, xor},
+    utils::{hash_to_bytes, lagrange_interp_eval, open_all_values, xor},
 };
 
 #[derive(CanonicalSerialize, CanonicalDeserialize)]
@@ -56,15 +55,10 @@ impl<E: Pairing> SecretKey<E> {
     }
 }
 
-/// interpolate a polynomial given evaluations at sufficiently many points
-pub fn interpolate<F: FftField, T: DomainCoeff<F>>(x: Vec<F>, y: Vec<T>) -> Vec<T> {
-    todo!()
-}
-
 /// decrypts all the ciphertexts in a batch
 pub fn decrypt_all<E: Pairing>(
     public_keys: &Vec<E::G2>,
-    partial_decryptions: &Vec<E::G1Affine>,
+    partial_decryptions: &BTreeMap<usize, E::G1>,
     ct: &Vec<Ciphertext<E>>,
     hid: E::G1,
     crs: &CRS<E>,
@@ -87,32 +81,23 @@ pub fn decrypt_all<E: Pairing>(
 
     // check that all partial_decryptions are valid
     let h_inv = -E::G2::generator();
-    for i in 0..public_keys.len() {
-        let should_be_zero = E::multi_miller_loop(
-            [delta, partial_decryptions[i].into()],
-            [public_keys[i], h_inv],
-        );
-
+    for (&i, &pd) in partial_decryptions.iter() {
+        let should_be_zero = E::multi_miller_loop([delta, pd], [public_keys[i - 1], h_inv]);
         let should_be_zero = E::final_exponentiation(should_be_zero).unwrap();
-
         assert!(should_be_zero.is_zero());
     }
 
-    // // interpolate partial decryptions to get the signature
-    // // gather partial decryptions into a vec by iterating over the BTreeMap
-    // let mut evals = Vec::new();
-    // let mut eval_points = Vec::new();
-    // // Iterate over the map and collect keys and values
-    // for (key, value) in partial_decryptions.iter() {
-    //     evals.push(*value);
-    //     eval_points.push(key);
-    // }
+    // interpolate partial decryptions to get the signature
+    // gather partial decryptions into a vec by iterating over the BTreeMap
+    let mut evals = Vec::new();
+    let mut eval_points = Vec::new();
+    // Iterate over the map and collect keys and values
+    for (&key, &value) in partial_decryptions.iter() {
+        evals.push(value);
+        eval_points.push(E::ScalarField::from(key as u64));
+    }
 
-    // compute msm with lagrange_coeffs_0 and partial_decryptions
-    // TODO: FIX THIS
-    // let sigma =
-    //     <E::G1 as VariableBaseMSM>::msm(&partial_decryptions, &crs.lagrange_coeffs_0).unwrap();
-    let sigma = E::G1::zero();
+    let sigma = lagrange_interp_eval(&eval_points, &vec![E::ScalarField::zero()], &evals)[0];
 
     // use FK22 to get all the KZG proofs in O(nlog n) time =======================
     let pi = open_all_values::<E>(&crs.y, &fcoeffs, &tx_domain);
