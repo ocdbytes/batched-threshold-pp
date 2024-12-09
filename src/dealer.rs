@@ -1,5 +1,4 @@
-use ark_ec::{pairing::Pairing, scalar_mul::ScalarMul, PrimeGroup, VariableBaseMSM};
-use ark_ff::PrimeField;
+use ark_ec::{pairing::Pairing, scalar_mul::ScalarMul, PrimeGroup};
 use ark_poly::{domain::EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::*;
 use ark_std::{rand::RngCore, One, UniformRand, Zero};
@@ -11,9 +10,9 @@ pub struct CRS<E: Pairing> {
     pub powers_of_g: Vec<E::G1Affine>,
     pub htau: E::G2,
 
-    pub y: Vec<E::G1Affine>,
+    pub y: Vec<E::G1Affine>, // Preprocessed Toeplitz matrix to compute opening proofs at all points
 
-    pub lagrange_coeffs_0: Vec<E::ScalarField>,
+    pub lagrange_coeffs_0: Vec<E::ScalarField>, // Lagrange coefficient to evaluate a polynomial at 0 given evaluations at roots of unity
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]

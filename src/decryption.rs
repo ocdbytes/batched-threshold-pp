@@ -1,4 +1,4 @@
-use ark_ec::{pairing::Pairing, PrimeGroup};
+use ark_ec::{pairing::Pairing, PrimeGroup, VariableBaseMSM};
 use ark_ff::Field;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::*;
@@ -7,7 +7,7 @@ use ark_std::Zero;
 use crate::{
     dealer::CRS,
     encryption::Ciphertext,
-    utils::{hash_to_bytes, open_all_values, pedersen_commit, xor},
+    utils::{hash_to_bytes, open_all_values, xor},
 };
 
 #[derive(CanonicalSerialize, CanonicalDeserialize)]
@@ -45,7 +45,7 @@ impl<E: Pairing> SecretKey<E> {
             fevals[i] = E::ScalarField::from_random_bytes(&tg_bytes).unwrap();
         }
         let fcoeffs = tx_domain.ifft(&fevals);
-        let com = pedersen_commit::<E::G1>(&crs.powers_of_g, &fcoeffs);
+        let com = <E::G1 as VariableBaseMSM>::msm(&crs.powers_of_g, &fcoeffs).unwrap();
         let delta = hid - com;
 
         let pd = delta * self.sk_share;
@@ -75,7 +75,7 @@ pub fn decrypt_all<E: Pairing>(
 
     let fcoeffs = tx_domain.ifft(&fevals);
 
-    let com = pedersen_commit::<E::G1>(&crs.powers_of_g, &fcoeffs);
+    let com = <E::G1 as VariableBaseMSM>::msm(&crs.powers_of_g, &fcoeffs).unwrap();
     let delta = hid - com;
 
     // check that all partial_decryptions are valid
@@ -92,7 +92,8 @@ pub fn decrypt_all<E: Pairing>(
     }
 
     // compute msm with lagrange_coeffs_0 and partial_decryptions
-    let sigma = pedersen_commit::<E::G1>(&partial_decryptions, &crs.lagrange_coeffs_0);
+    let sigma =
+        <E::G1 as VariableBaseMSM>::msm(&partial_decryptions, &crs.lagrange_coeffs_0).unwrap();
 
     // use FK22 to get all the KZG proofs in O(nlog n) time =======================
     let pi = open_all_values::<E>(&crs.y, &fcoeffs, &tx_domain);

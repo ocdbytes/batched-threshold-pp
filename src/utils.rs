@@ -1,5 +1,4 @@
-use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
-use ark_ff::PrimeField;
+use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_poly::{
     univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, Polynomial,
     Radix2EvaluationDomain,
@@ -63,21 +62,7 @@ pub fn compute_opening_proof<E: Pairing>(
     ]);
     let witness_polynomial = numerator.div(&divisor);
 
-    pedersen_commit::<E::G1>(&crs.powers_of_g, &witness_polynomial.coeffs())
-}
-
-pub fn pedersen_commit<G: CurveGroup>(bases: &[G::Affine], scalars: &[G::ScalarField]) -> G {
-    debug_assert_eq!(bases.len(), scalars.len());
-
-    let plain_scalars = convert_to_bigints(&scalars);
-    <G as VariableBaseMSM>::msm_bigint(&bases, &plain_scalars)
-}
-
-fn convert_to_bigints<F: PrimeField>(p: &[F]) -> Vec<F::BigInt> {
-    let coeffs = ark_std::cfg_iter!(p)
-        .map(|s| s.into_bigint())
-        .collect::<Vec<_>>();
-    coeffs
+    <E::G1 as VariableBaseMSM>::msm(&crs.powers_of_g, &witness_polynomial.coeffs()).unwrap()
 }
 
 /// Computes all the openings of a KZG commitment in O(n log n) time
@@ -146,7 +131,7 @@ mod tests {
             f[i] = Fr::rand(&mut rng);
         }
 
-        let com = pedersen_commit::<G1>(&crs.powers_of_g, &f);
+        let com = <G1 as VariableBaseMSM>::msm(&crs.powers_of_g, &f).unwrap();
         let pi = open_all_values::<E>(&crs.y, &f, &domain);
 
         // verify the kzg proof
