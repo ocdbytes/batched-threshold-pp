@@ -7,7 +7,7 @@ use ark_poly::{
 use ark_serialize::CanonicalSerialize;
 use ark_std::{One, Zero};
 use merlin::Transcript;
-use std::{collections::BTreeMap, ops::Div};
+use std::ops::Div;
 
 use crate::dealer::CRS;
 
@@ -34,37 +34,38 @@ pub fn add_to_transcript<T: CanonicalSerialize>(
     ts.append_message(label, &data_bytes);
 }
 
-/// interpolates a polynomial over poly_evals and evaluates it at points
+/// given evaluations of a polynomial over given_domain
+/// interpolates the polynomial and evaluates it on target_domain
 pub fn lagrange_interp_eval<F: FftField, T: DomainCoeff<F>>(
-    poly_evals: &BTreeMap<F, T>,
-    points: &Vec<F>,
+    given_domain: &Vec<F>,
+    target_domain: &Vec<F>,
+    evals: &Vec<T>,
 ) -> Vec<T> {
-    let mut x = Vec::new();
-    let mut y = Vec::new();
-    for (&x_i, &y_i) in poly_evals.iter() {
-        x.push(x_i);
-        y.push(y_i);
-    }
+    debug_assert_eq!(
+        given_domain.len(),
+        evals.len(),
+        "Evals length does not match given_domain length"
+    );
 
     let mut result = Vec::new();
-    for &point in points {
-        let mut lagrange_coeffs = vec![F::one(); x.len()];
+    for &point in target_domain.iter() {
+        let mut lagrange_coeffs = vec![F::one(); given_domain.len()];
 
-        for i in 0..x.len() {
+        for i in 0..given_domain.len() {
             let mut num = F::one();
             let mut denom = F::one();
-            for j in 0..x.len() {
-                if x[i] != x[j] {
-                    num *= point - x[j];
-                    denom *= x[i] - x[j];
+            for j in 0..given_domain.len() {
+                if given_domain[i] != given_domain[j] {
+                    num *= point - given_domain[j];
+                    denom *= given_domain[i] - given_domain[j];
                 }
             }
             lagrange_coeffs[i] = num / denom;
         }
 
         let mut point_eval = T::zero();
-        for i in 0..x.len() {
-            let mut tmp = y[i];
+        for i in 0..given_domain.len() {
+            let mut tmp = evals[i];
             tmp.mul_assign(lagrange_coeffs[i]);
             point_eval += tmp;
         }
@@ -182,8 +183,8 @@ mod tests {
             .map(|i| Fr::from(i as u64))
             .collect::<Vec<_>>();
 
-        let points = (0..domain_size)
-            .map(|i| Fr::from((i) as u64))
+        let points = (0..domain_size / 2)
+            .map(|i| Fr::from((domain_size + i) as u64))
             .collect::<Vec<_>>();
 
         let f = (0..domain_size)
@@ -192,12 +193,12 @@ mod tests {
 
         let f = DensePolynomial::from_coefficients_vec(f);
 
-        let poly_evals = BTreeMap::from_iter(domain.iter().map(|&e| (e, f.evaluate(&e))));
+        let evals = domain.iter().map(|&e| f.evaluate(&e)).collect::<Vec<_>>();
 
-        let computed_evals = lagrange_interp_eval(&poly_evals, &points);
+        let computed_evals = lagrange_interp_eval(&domain, &points, &evals);
         let should_be_evals = points.iter().map(|p| f.evaluate(p)).collect::<Vec<_>>();
 
-        for i in 0..domain_size {
+        for i in 0..points.len() {
             assert_eq!(computed_evals[i], should_be_evals[i]);
         }
     }

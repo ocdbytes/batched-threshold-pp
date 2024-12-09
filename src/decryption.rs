@@ -109,8 +109,10 @@ pub fn decrypt_all<E: Pairing>(
     // }
 
     // compute msm with lagrange_coeffs_0 and partial_decryptions
-    let sigma =
-        <E::G1 as VariableBaseMSM>::msm(&partial_decryptions, &crs.lagrange_coeffs_0).unwrap();
+    // TODO: FIX THIS
+    // let sigma =
+    //     <E::G1 as VariableBaseMSM>::msm(&partial_decryptions, &crs.lagrange_coeffs_0).unwrap();
+    let sigma = E::G1::zero();
 
     // use FK22 to get all the KZG proofs in O(nlog n) time =======================
     let pi = open_all_values::<E>(&crs.y, &fcoeffs, &tx_domain);
