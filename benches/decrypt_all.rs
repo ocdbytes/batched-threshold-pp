@@ -6,7 +6,7 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::UniformRand;
 use batch_threshold::{
     dealer::Dealer,
-    decryption::{decrypt_all, SecretKey},
+    decryption::{aggregate_partial_decryptions, decrypt_all, SecretKey},
     encryption::{encrypt, Ciphertext},
 };
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
@@ -34,7 +34,6 @@ fn bench_decrypt_all(c: &mut Criterion) {
         for i in 0..n {
             secret_key.push(SecretKey::new(sk_shares[i]));
         }
-        let public_keys = secret_key.iter().map(|sk| sk.get_pk()).collect::<Vec<_>>();
 
         let msg = [1u8; 32];
 
@@ -50,12 +49,13 @@ fn bench_decrypt_all(c: &mut Criterion) {
 
         // generate partial decryptions
         let mut partial_decryptions: BTreeMap<usize, G1> = BTreeMap::new();
-        for i in 0..n {
+        for i in 0..n / 2 {
             let partial_decryption = secret_key[i].partial_decrypt(&ct, hid, pk, &crs);
             partial_decryptions.insert(i + 1, partial_decryption);
         }
 
-        let messages = decrypt_all(&public_keys, &partial_decryptions, &ct, hid, &crs);
+        let sigma = aggregate_partial_decryptions(&partial_decryptions);
+        let messages = decrypt_all(sigma, &ct, hid, &crs);
         for i in 0..batch_size {
             assert_eq!(msg, messages[i]);
         }
@@ -63,9 +63,12 @@ fn bench_decrypt_all(c: &mut Criterion) {
         // bench full decryption
         group.bench_with_input(
             BenchmarkId::from_parameter(batch_size),
-            &(public_keys, partial_decryptions, ct, hid, crs),
+            &(partial_decryptions, ct, hid, crs),
             |b, inp| {
-                b.iter(|| decrypt_all(&inp.0, &inp.1, &inp.2, inp.3, &inp.4));
+                b.iter(|| {
+                    let sigma = aggregate_partial_decryptions(&inp.0);
+                    decrypt_all(sigma, &inp.1, inp.2, &inp.3);
+                });
             },
         );
     }

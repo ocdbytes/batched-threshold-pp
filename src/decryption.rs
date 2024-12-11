@@ -55,10 +55,25 @@ impl<E: Pairing> SecretKey<E> {
     }
 }
 
+/// aggregate partial decryptions into a signature on H(id)/com
+pub fn aggregate_partial_decryptions<G: PrimeGroup>(partial_decryptions: &BTreeMap<usize, G>) -> G {
+    // interpolate partial decryptions to recover the signature
+    let mut evals = Vec::new();
+    let mut eval_points = Vec::new();
+    // Iterate over the map and collect keys and values
+    for (&key, &value) in partial_decryptions.iter() {
+        evals.push(value);
+        eval_points.push(G::ScalarField::from(key as u64));
+    }
+
+    let sigma = lagrange_interp_eval(&eval_points, &vec![G::ScalarField::zero()], &evals)[0];
+
+    sigma
+}
+
 /// decrypts all the ciphertexts in a batch
 pub fn decrypt_all<E: Pairing>(
-    public_keys: &Vec<E::G2>,
-    partial_decryptions: &BTreeMap<usize, E::G1>,
+    sigma: E::G1,
     ct: &Vec<Ciphertext<E>>,
     hid: E::G1,
     crs: &CRS<E>,
@@ -78,26 +93,6 @@ pub fn decrypt_all<E: Pairing>(
 
     let com = <E::G1 as VariableBaseMSM>::msm(&crs.powers_of_g, &fcoeffs).unwrap();
     let delta = hid - com;
-
-    // check that all partial_decryptions are valid
-    let h_inv = -E::G2::generator();
-    for (&i, &pd) in partial_decryptions.iter() {
-        let should_be_zero = E::multi_miller_loop([delta, pd], [public_keys[i - 1], h_inv]);
-        let should_be_zero = E::final_exponentiation(should_be_zero).unwrap();
-        assert!(should_be_zero.is_zero());
-    }
-
-    // interpolate partial decryptions to get the signature
-    // gather partial decryptions into a vec by iterating over the BTreeMap
-    let mut evals = Vec::new();
-    let mut eval_points = Vec::new();
-    // Iterate over the map and collect keys and values
-    for (&key, &value) in partial_decryptions.iter() {
-        evals.push(value);
-        eval_points.push(E::ScalarField::from(key as u64));
-    }
-
-    let sigma = lagrange_interp_eval(&eval_points, &vec![E::ScalarField::zero()], &evals)[0];
 
     // use FK22 to get all the KZG proofs in O(nlog n) time =======================
     let pi = open_all_values::<E>(&crs.y, &fcoeffs, &tx_domain);
