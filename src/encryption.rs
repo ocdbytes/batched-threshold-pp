@@ -3,7 +3,6 @@ use ark_ff::{Field, PrimeField};
 use ark_serialize::*;
 use ark_std::UniformRand;
 use merlin::Transcript;
-use rand::thread_rng;
 use retry::{delay::NoDelay, retry};
 
 use crate::utils::{add_to_transcript, hash_to_bytes, xor};
@@ -69,9 +68,8 @@ pub fn encrypt<E: Pairing>(
     hid: E::G1,
     htau: E::G2,
     pk: E::G2,
+    rng: &mut impl rand::Rng,
 ) -> Ciphertext<E> {
-    let rng = &mut thread_rng();
-
     let g = E::G1::generator();
     let h = E::G2::generator();
 
@@ -195,8 +193,8 @@ mod tests {
         let x = tx_domain.group_gen;
 
         let hid = G1::rand(&mut rng);
-
-        let ct = encrypt::<Bls12_381>(msg, x, hid, crs.htau, pk);
+        let rng = &mut thread_rng();
+        let ct = encrypt::<Bls12_381>(msg, x, hid, crs.htau, pk, rng);
 
         let mut ct_bytes = Vec::new();
         ct.serialize_compressed(&mut ct_bytes).unwrap();

@@ -36,7 +36,7 @@ fn main() {
     // generate ciphertexts for all points in tx_domain
     let mut ct: Vec<Ciphertext<E>> = Vec::new();
     for x in tx_domain.elements() {
-        ct.push(encrypt::<E>(msg, x, hid, crs.htau, pk));
+        ct.push(encrypt::<E>(msg, x, hid, crs.htau, pk, &mut rng));
     }
 
     // generate partial decryptions

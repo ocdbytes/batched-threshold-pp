@@ -37,7 +37,7 @@ fn bench_encrypt(c: &mut Criterion) {
             BenchmarkId::from_parameter(batch_size),
             &(msg, hid, crs.htau, pk),
             |b, &inp| {
-                b.iter(|| encrypt::<E>(inp.0, Fr::one(), inp.1, inp.2, inp.3));
+                b.iter(|| encrypt::<E>(inp.0, Fr::one(), inp.1, inp.2, inp.3, &mut rng));
             },
         );
     }
