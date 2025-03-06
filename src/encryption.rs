@@ -3,6 +3,7 @@ use ark_ff::{Field, PrimeField};
 use ark_serialize::*;
 use ark_std::UniformRand;
 use merlin::Transcript;
+use rand::thread_rng;
 use retry::{delay::NoDelay, retry};
 
 use crate::utils::{add_to_transcript, hash_to_bytes, xor};
@@ -68,15 +69,16 @@ pub fn encrypt<E: Pairing>(
     hid: E::G1,
     htau: E::G2,
     pk: E::G2,
-    rng: &mut impl rand::Rng,
 ) -> Ciphertext<E> {
+    let mut rng = thread_rng();
+
     let g = E::G1::generator();
     let h = E::G2::generator();
 
     // hash element S to curve to get tg
     // retry if bytes cannot be converted to a field element
     let result = retry(NoDelay, || {
-        let s = E::ScalarField::rand(rng);
+        let s = E::ScalarField::rand(&mut rng);
         let gs = g * s;
         let hgs = hash_to_bytes(gs);
         let tg_option = E::ScalarField::from_random_bytes(&hgs);
@@ -96,8 +98,8 @@ pub fn encrypt<E: Pairing>(
     let (s, gs, tg) = result.unwrap();
 
     // compute mask
-    let alpha = E::ScalarField::rand(rng);
-    let beta = E::ScalarField::rand(rng);
+    let alpha = E::ScalarField::rand(&mut rng);
+    let beta = E::ScalarField::rand(&mut rng);
     let mask = E::pairing(hid - (g * tg), h) * alpha; //e(H(id)/g^tg, h)^alpha
     let hmask = hash_to_bytes(mask);
 
@@ -113,9 +115,9 @@ pub fn encrypt<E: Pairing>(
     // prover sends z_alpha = r_alpha + c*alpha, z_beta = r_beta + c*beta, and z_s = r_s + c*s
     // verifier checks that k2.ct2^c = h^{(tau-x)*z_alpha}, k3.ct3^c = h^{z_alpha} * pk^{z_beta}, k4.ct4^c = h^{z_beta}, and k_s.gs^c = g^{z_s}
 
-    let r_alpha = E::ScalarField::rand(rng);
-    let r_beta = E::ScalarField::rand(rng);
-    let r_s = E::ScalarField::rand(rng);
+    let r_alpha = E::ScalarField::rand(&mut rng);
+    let r_beta = E::ScalarField::rand(&mut rng);
+    let r_s = E::ScalarField::rand(&mut rng);
 
     let k2 = (htau - (h * x)) * r_alpha;
     let k3 = h * r_alpha + pk * r_beta;
@@ -194,7 +196,7 @@ mod tests {
 
         let hid = G1::rand(&mut rng);
         let rng = &mut thread_rng();
-        let ct = encrypt::<Bls12_381>(msg, x, hid, crs.htau, pk, rng);
+        let ct = encrypt::<Bls12_381>(msg, x, hid, crs.htau, pk);
 
         let mut ct_bytes = Vec::new();
         ct.serialize_compressed(&mut ct_bytes).unwrap();
